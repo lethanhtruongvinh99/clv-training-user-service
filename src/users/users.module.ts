@@ -4,10 +4,15 @@ import { UsersController } from './users.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
+    JwtModule.register({
+      secret: '123',
+      signOptions: { expiresIn: '60m' },
+    }),
     ClientsModule.register([
       {
         name: 'AUTH_KAFKA',

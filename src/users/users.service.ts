@@ -3,6 +3,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -10,8 +11,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { ClientKafka } from '@nestjs/microservices';
+import { JwtService } from '@nestjs/jwt';
 
 const bcrypt = require('bcrypt');
+const passwordGenerator = require('generate-password');
 
 @Injectable()
 export class UsersService {
@@ -20,6 +23,7 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
     private readonly dataSource: DataSource,
     @Inject('AUTH_KAFKA') private readonly authKafka: ClientKafka,
+    private readonly jwtService: JwtService,
   ) {}
 
   private readonly userDataSource = this.dataSource.getRepository(User);
@@ -78,6 +82,23 @@ export class UsersService {
     return user;
   }
 
+  async validateToken(token: string) {
+    // try to verify.
+    // if ok
+    // decode and send back
+    console.log(token);
+    console.log(this.jwtService.decode(token));
+    // console.log(this.jwtService.verify(token));
+    try {
+      const isValid = this.jwtService.verify(token);
+      // return this.jwtService.decode(token);
+      return isValid;
+    } catch (error) {
+      Logger.log(error);
+      return false;
+    }
+  }
+
   async userSignup(createUserDto: CreateUserDto) {
     const users = await this.userRepository.find({
       where: { email: createUserDto.email },
@@ -104,7 +125,12 @@ export class UsersService {
     if (targetUser) {
       return targetUser;
     } else {
-      user.password = '123123';
+      const defaultPassword = passwordGenerator.generate({
+        length: 10,
+        numbers: true,
+      });
+      console.log(defaultPassword);
+      user.password = defaultPassword;
       const salt = bcrypt.genSaltSync(10);
       const hashed = bcrypt.hashSync(user.password, salt);
       user.salt = salt;
@@ -113,6 +139,11 @@ export class UsersService {
         ...user,
         first_name: user.firstName,
         last_name: user.lastName,
+      });
+      this.authKafka.send('google-signup', {
+        email: user.email,
+        password: defaultPassword,
+        name: `${user.firstName} ${user.lastName}`,
       });
       return await this.userRepository.save(newUser);
     }

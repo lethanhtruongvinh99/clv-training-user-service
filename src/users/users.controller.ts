@@ -45,6 +45,11 @@ export class UsersController {
     return this.usersService.validateUser(payload);
   }
 
+  @MessagePattern({ role: 'auth', cmd: 'validate-token' })
+  async validateToken(@Payload() payload: { token: string }) {
+    return this.usersService.validateToken(payload.token);
+  }
+
   @MessagePattern({ role: 'auth', cmd: 'signup' })
   async userSignup(@Payload() payload: { user: CreateUserDto }) {
     return this.usersService.userSignup(payload.user);
